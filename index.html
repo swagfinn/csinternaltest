@@ -175,6 +175,41 @@
   .status.err{color:var(--bad);}
   .table-scroll{overflow-x:auto;}
 
+  /* reviewer filters */
+  .rev-filters{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:8px;}
+  .rev-filters select{background:rgba(0,0,0,.25);border:1px solid var(--border);color:var(--text);
+    border-radius:10px;padding:9px 12px;font-family:inherit;font-size:.9rem;cursor:pointer;}
+  .rev-filters select:focus{outline:none;border-color:var(--accent);}
+  .rev-filters .chk{display:inline-flex;align-items:center;gap:7px;color:var(--text-dim);font-size:.9rem;cursor:pointer;}
+  .rev-filters .chk input{accent-color:var(--accent);width:16px;height:16px;}
+  .rev-filters .rev-count{color:var(--text-dim);font-size:.85rem;margin-left:auto;}
+
+  /* grade panel */
+  .grade-q{border:1px solid var(--border);background:rgba(0,0,0,.15);border-radius:12px;padding:16px;margin-top:12px;}
+  .grade-q .rv-q{font-weight:600;}
+  .grade-q .stu-a{margin-top:8px;color:var(--text-dim);white-space:pre-wrap;background:rgba(255,255,255,.03);
+    border-left:3px solid var(--border-strong);padding:8px 12px;border-radius:6px;font-size:.9rem;}
+  .grade-q .stu-a.empty{color:var(--warn);border-left-color:var(--warn);}
+  .grade-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;}
+  .mark-toggle{display:flex;gap:8px;}
+  .mark{border:1px solid var(--border);background:rgba(0,0,0,.2);color:var(--text-dim);border-radius:10px;
+    padding:7px 14px;cursor:pointer;font-weight:700;font-size:.9rem;font-family:inherit;transition:.15s;}
+  .mark:hover{border-color:var(--border-strong);}
+  .mark.ok.active{background:rgba(49,208,170,.18);color:var(--good);border-color:var(--good);}
+  .mark.no.active{background:rgba(255,93,108,.16);color:var(--bad);border-color:var(--bad);}
+  .pts{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);font-size:.9rem;}
+  .pts input{width:74px;padding:8px 10px;text-align:center;background:rgba(0,0,0,.25);
+    border:1px solid var(--border);color:var(--text);border-radius:10px;font-family:inherit;font-size:.95rem;}
+  .pts input:focus{outline:none;border-color:var(--accent);}
+  .q-comment{margin-top:10px;padding:9px 12px;font-size:.9rem;}
+  .grade-total-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:20px;
+    background:linear-gradient(135deg,rgba(79,140,255,.14),rgba(124,92,255,.14));
+    border:1px solid var(--border-strong);border-radius:14px;padding:16px 20px;}
+  .grade-total-bar .gt-label{font-weight:700;letter-spacing:1px;}
+  .grade-total-bar .gt-value{font-size:1.6rem;font-weight:800;color:#fff;}
+  .grade-total-bar .gt-unit{font-size:1rem;font-weight:600;color:var(--text-dim);}
+  .grade-total-bar .sub{margin-left:8px;font-size:.85rem;}
+
   @media (max-width:520px){
     .wrap{padding:20px 14px 90px;}
     #timer{top:12px;right:12px;padding:8px 14px;}
@@ -236,19 +271,18 @@
     <div id="quiz-questions"></div>
     <div class="card">
       <button class="btn primary block" id="btn-submit">送出試卷</button>
-      <div class="hint" style="text-align:center;">送出後可於檢查頁核對,確認無誤再二次送出。</div>
     </div>
   </section>
 
   <!-- ============ 檢查頁(唯讀) ============ -->
   <section class="screen" id="screen-review">
     <div class="card">
-      <h1>檢查作答內容</h1>
-      <p class="sub">以下為您的作答彙整,此頁面無法修改。請核對後選擇下一步。</p>
+      <h1>請檢查作答內容</h1>
+      <p class="sub">以下為您填寫的答案，請核對內容，確認後點擊送出試卷或上一頁編輯作答內容</p>
       <div id="review-list"></div>
       <div class="btn-row">
-        <button class="btn ghost" id="btn-edit">← 上一頁,編輯作答</button>
-        <button class="btn primary" id="btn-confirm">✓ 第二次確認送出</button>
+        <button class="btn ghost" id="btn-edit">← 上一頁</button>
+        <button class="btn primary" id="btn-confirm">送出試卷</button>
       </div>
       <div class="status" id="submit-status"></div>
     </div>
@@ -276,10 +310,19 @@
           <button class="btn ghost small" id="btn-rev-back">← 返回</button>
         </div>
       </div>
+      <div class="rev-filters">
+        <select id="filter-mode"><option value="">全部模式</option></select>
+        <select id="filter-sort">
+          <option value="newest">最近提交</option>
+          <option value="oldest">最早提交</option>
+        </select>
+        <label class="chk"><input type="checkbox" id="filter-ungraded" /> 只看未評分</label>
+        <span class="rev-count" id="rev-count"></span>
+      </div>
       <div class="table-scroll">
         <table id="rev-table">
           <thead>
-            <tr><th>#</th><th>Email</th><th>作答時間</th><th>模式</th><th>耗時</th><th>評分</th><th></th></tr>
+            <tr><th>序</th><th>Email</th><th>作答時間</th><th>模式</th><th>耗時</th><th>評分</th><th></th></tr>
           </thead>
           <tbody id="rev-body"><tr><td colspan="7" class="loading">載入中…</td></tr></tbody>
         </table>
@@ -289,16 +332,20 @@
     <!-- 批改單筆 -->
     <div class="card" id="grade-panel" style="display:none;">
       <div class="q-head">
-        <h2 id="grade-title">批改</h2>
+        <div>
+          <h2 id="grade-title">批改</h2>
+          <p class="sub" id="grade-sub"></p>
+        </div>
         <button class="btn ghost small" id="btn-grade-close">關閉</button>
       </div>
       <div id="grade-detail"></div>
-      <div class="field" style="max-width:220px;">
-        <label>評分(寫入 C 欄)</label>
-        <input type="text" id="grade-score" placeholder="例如 85 / 通過 / A" />
+      <div class="grade-total-bar">
+        <div class="gt-label">試卷得分</div>
+        <div class="gt-value"><span id="grade-total">0</span><span class="gt-unit"> 分</span>
+          <span class="sub" id="grade-maxnote"></span></div>
       </div>
       <div class="btn-row">
-        <button class="btn primary" id="btn-grade-save">儲存評分</button>
+        <button class="btn primary" id="btn-grade-save">儲存得分</button>
       </div>
       <div class="status" id="grade-status"></div>
     </div>
@@ -439,7 +486,10 @@ function renderModeGrid(){
   });
 }
 document.getElementById("btn-back-modes").addEventListener("click", ()=>{
-  if(confirm("返回模式選擇將清除目前作答,確定?")){ resetTimer(); showScreen("screen-modes"); }
+  if(timerStarted && !confirm("返回模式選擇將清除目前作答,確定?")) return;
+  resetTimer();
+  renderModeGrid();
+  showScreen("screen-modes");
 });
 
 /* ==========================================================================
@@ -630,7 +680,9 @@ function submitToSheet(){
   status.textContent = "送出中…";
 
   const quiz = QUIZZES[currentMode];
-  const answers = quiz.questions.map(q => readAnswer(q).display); // F 起，依序 Q1、Q2…
+  const answers = quiz.questions.map(q => readAnswer(q).display);        // 純答案
+  const questions = quiz.questions.map((q,i) => `Q${i+1}. ${q.text}`);   // 題目（含 Q 編號）
+  const submitId = Date.now() + "_" + Math.random().toString(36).slice(2,8); // 唯一識別碼
   const durationText = fmtDuration(currentElapsedMs());
   const dateText = new Date(answerStartISO).toLocaleString("zh-TW",{timeZone:"Asia/Taipei",hour12:false});
 
@@ -640,7 +692,9 @@ function submitToSheet(){
     datetime: dateText,
     duration: durationText,
     mode: quiz.title,
-    answers: JSON.stringify(answers)
+    answers: JSON.stringify(answers),
+    questions: JSON.stringify(questions),
+    id: submitId
   }).then(res=>{
     if(res && res.ok){
       document.getElementById("done-summary").textContent =
@@ -670,8 +724,13 @@ document.getElementById("btn-refresh").addEventListener("click", loadSubmissions
 document.getElementById("btn-grade-close").addEventListener("click", ()=>{
   document.getElementById("grade-panel").style.display = "none";
 });
+// 篩選控制項變動即重繪
+["filter-mode","filter-sort","filter-ungraded"].forEach(id=>{
+  document.getElementById(id).addEventListener("change", renderReviewTable);
+});
 
-let currentGradeRow = null;
+let currentGradeItem = null;
+let reviewItems = [];
 
 function openReviewer(){
   showScreen("screen-reviewer");
@@ -685,67 +744,129 @@ function loadSubmissions(){
 
   jsonp({ action:"list", email: currentEmail }).then(res=>{
     if(!res || !res.ok) throw new Error(res && res.error ? res.error : "讀取失敗");
-    const items = res.items || [];
-    if(items.length === 0){
-      body.innerHTML = `<tr><td colspan="7" class="loading">尚無作答紀錄</td></tr>`;
-      return;
-    }
-    body.innerHTML = "";
-    items.slice().reverse().forEach(it=>{
-      const scored = it.score !== "" && it.score !== null && it.score !== undefined;
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${it.row}</td>
-        <td>${escapeHtml(String(it.email||""))}</td>
-        <td>${escapeHtml(String(it.datetime||""))}</td>
-        <td>${escapeHtml(String(it.mode||""))}</td>
-        <td>${escapeHtml(String(it.duration||""))}</td>
-        <td><span class="score-pill ${scored?"":"empty"}">${scored?escapeHtml(String(it.score)):"未評"}</span></td>
-        <td><button class="btn small" data-row="${it.row}">批改</button></td>`;
-      tr.querySelector("button").addEventListener("click", ()=>openGrade(it));
-      body.appendChild(tr);
-    });
+    reviewItems = res.items || [];
+    populateModeFilter();
+    renderReviewTable();
   }).catch(err=>{
     body.innerHTML = `<tr><td colspan="7" class="loading" style="color:var(--bad)">讀取失敗:${escapeHtml(err.message)}</td></tr>`;
   });
 }
 
-function openGrade(item){
-  currentGradeRow = item.row;
-  const panel = document.getElementById("grade-panel");
-  document.getElementById("grade-title").textContent = `批改 · 第 ${item.row} 列 · ${item.email}`;
-  document.getElementById("grade-score").value = (item.score ?? "");
-  document.getElementById("grade-status").textContent = "";
-  document.getElementById("grade-status").className = "status";
+function populateModeFilter(){
+  const sel = document.getElementById("filter-mode");
+  const cur = sel.value;
+  const modes = [...new Set(reviewItems.map(i=>i.mode).filter(Boolean))];
+  sel.innerHTML = '<option value="">全部模式</option>' +
+    modes.map(m=>`<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("");
+  if(modes.includes(cur)) sel.value = cur; // 保留原選擇
+}
 
-  // 依模式名稱回推題目文字，與作答配對
+function renderReviewTable(){
+  const body = document.getElementById("rev-body");
+  const mode = document.getElementById("filter-mode").value;
+  const sort = document.getElementById("filter-sort").value;
+  const ungraded = document.getElementById("filter-ungraded").checked;
+
+  let items = reviewItems.slice();
+  if(mode) items = items.filter(i => i.mode === mode);
+  if(ungraded) items = items.filter(i => i.score === "" || i.score === null || i.score === undefined);
+  items.sort((a,b)=> sort === "oldest" ? a.order - b.order : b.order - a.order);
+
+  document.getElementById("rev-count").textContent = `共 ${items.length} 筆`;
+
+  if(items.length === 0){
+    body.innerHTML = `<tr><td colspan="7" class="loading">沒有符合條件的紀錄</td></tr>`;
+    return;
+  }
+  body.innerHTML = "";
+  items.forEach(it=>{
+    const scored = it.score !== "" && it.score !== null && it.score !== undefined;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${it.order + 1}</td>
+      <td>${escapeHtml(String(it.email||""))}</td>
+      <td>${escapeHtml(String(it.datetime||""))}</td>
+      <td>${escapeHtml(String(it.mode||""))}</td>
+      <td>${escapeHtml(String(it.duration||""))}</td>
+      <td><span class="score-pill ${scored?"":"empty"}">${scored?escapeHtml(String(it.score)):"未評"}</span></td>
+      <td><button class="btn small">批改</button></td>`;
+    tr.querySelector("button").addEventListener("click", ()=>openGrade(it));
+    body.appendChild(tr);
+  });
+}
+
+function openGrade(item){
+  currentGradeItem = item;
+  const panel = document.getElementById("grade-panel");
   const quiz = Object.values(QUIZZES).find(q => q.title === item.mode);
+  const modeName = item.mode || "未知模式";
+  const answers = item.answers || [];
+  const n = answers.length;
+
+  document.getElementById("grade-title").textContent = `「${modeName}」批改`;
+  document.getElementById("grade-sub").textContent =
+    `學員：${item.email} ・ 第 ${item.order + 1} 筆 ・ 共 ${n} 題`;
+
+  const defaultPts = n > 0 ? Math.round(100 / n) : 0; // 預設平均配分，可自行調整
+
   const detail = document.getElementById("grade-detail");
   detail.innerHTML = "";
-  const answers = item.answers || [];
   answers.forEach((ans, i)=>{
-    const qtext = (quiz && quiz.questions[i]) ? quiz.questions[i].text : `Q${i+1}`;
+    const qtext = (quiz && quiz.questions[i]) ? quiz.questions[i].text : `第 ${i+1} 題`;
     const filled = ans !== "" && ans !== null && ans !== undefined;
-    const div = document.createElement("div");
-    div.className = "rv-item" + (filled ? "" : " empty");
-    div.innerHTML = `
+    const row = document.createElement("div");
+    row.className = "grade-q";
+    row.innerHTML = `
       <div class="rv-q">Q${i+1}. ${escapeHtml(String(qtext))}</div>
-      <div class="rv-a">${filled ? escapeHtml(String(ans)) : "（未作答）"}</div>`;
-    detail.appendChild(div);
+      <div class="stu-a ${filled?'':'empty'}">${filled ? escapeHtml(String(ans)) : "（未作答）"}</div>
+      <div class="grade-controls">
+        <div class="mark-toggle">
+          <button type="button" class="mark ok" data-mark="ok">✓ 正確</button>
+          <button type="button" class="mark no" data-mark="no">✗ 錯誤</button>
+        </div>
+        <label class="pts">配分 <input type="number" class="q-points" min="0" step="1" value="${defaultPts}"> 分</label>
+      </div>
+      <input type="text" class="q-comment" placeholder="批改說明(選填)" />`;
+
+    const okBtn = row.querySelector(".mark.ok");
+    const noBtn = row.querySelector(".mark.no");
+    okBtn.addEventListener("click", ()=>{ okBtn.classList.add("active"); noBtn.classList.remove("active"); recomputeGradeTotal(); });
+    noBtn.addEventListener("click", ()=>{ noBtn.classList.add("active"); okBtn.classList.remove("active"); recomputeGradeTotal(); });
+    row.querySelector(".q-points").addEventListener("input", recomputeGradeTotal);
+    detail.appendChild(row);
   });
 
+  recomputeGradeTotal();
+  document.getElementById("grade-status").textContent = "";
+  document.getElementById("grade-status").className = "status";
   panel.style.display = "block";
   panel.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+// 加總「打勾(✓ 正確)」題目的配分 = 試卷得分；同時顯示滿分
+function recomputeGradeTotal(){
+  let total = 0, max = 0;
+  document.querySelectorAll("#grade-detail .grade-q").forEach(row=>{
+    const pts = parseFloat(row.querySelector(".q-points").value) || 0;
+    max += pts;
+    if(row.querySelector(".mark.ok").classList.contains("active")) total += pts;
+  });
+  // 去除浮點誤差
+  total = Math.round(total * 100) / 100;
+  max = Math.round(max * 100) / 100;
+  document.getElementById("grade-total").textContent = total;
+  document.getElementById("grade-maxnote").textContent = `滿分 ${max} 分`;
 }
 
 document.getElementById("btn-grade-save").addEventListener("click", ()=>{
   const btn = document.getElementById("btn-grade-save");
   const status = document.getElementById("grade-status");
-  const score = document.getElementById("grade-score").value.trim();
+  const score = document.getElementById("grade-total").textContent.trim();
+  if(!currentGradeItem) return;
   btn.disabled = true; status.className="status"; status.textContent="儲存中…";
-  jsonp({ action:"grade", email: currentEmail, row: currentGradeRow, score: score }).then(res=>{
+  jsonp({ action:"grade", email: currentEmail, id: currentGradeItem.id, mode: currentGradeItem.mode, score: score }).then(res=>{
     if(!res || !res.ok) throw new Error(res && res.error ? res.error : "寫入失敗");
-    status.className="status ok"; status.textContent="✓ 已寫入 C 欄";
+    status.className="status ok"; status.textContent=`✓ 已將 ${score} 分寫入(總表＋模式分頁)`;
     btn.disabled=false;
     loadSubmissions();
   }).catch(err=>{
