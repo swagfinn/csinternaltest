@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>SWAG 內部訓練測驗</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>📝</text></svg>" />
 <style>
   :root{
     --bg-0:#0a0e17;
@@ -23,17 +24,25 @@
     --shadow:0 12px 40px rgba(0,0,0,0.45);
   }
   *{box-sizing:border-box;margin:0;padding:0;}
-  html,body{height:100%;}
+  html,body{min-height:100%;}
   body{
     font-family:"Noto Sans TC","Segoe UI",system-ui,-apple-system,sans-serif;
     color:var(--text);
+    background:var(--bg-0);
+    min-height:100vh;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* 固定全螢幕背景層：不隨內容捲動，避免漸層邊界產生斷層 */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:-1;
     background:
       radial-gradient(1200px 700px at 15% -10%, rgba(79,140,255,0.16), transparent 60%),
       radial-gradient(1000px 700px at 110% 10%, rgba(124,92,255,0.15), transparent 55%),
       linear-gradient(160deg,var(--bg-0),var(--bg-1));
-    min-height:100vh;
-    line-height:1.6;
-    -webkit-font-smoothing:antialiased;
   }
   .wrap{max-width:840px;margin:0 auto;padding:32px 20px 96px;}
   .screen{display:none;animation:fadeUp .4s ease both;}
@@ -111,6 +120,12 @@
   .mode-card .meta{color:var(--text-dim);font-size:.85rem;margin-top:10px;}
   .mode-card.done{filter:grayscale(.85);opacity:.55;}
   .mode-card.done:hover{opacity:.8;transform:translateY(-2px);}
+  .mode-card.locked{filter:grayscale(1);opacity:.45;cursor:not-allowed;}
+  .mode-card.locked:hover{transform:none;border-color:var(--border);box-shadow:none;}
+  .mode-card .lock-badge{
+    position:absolute;top:12px;right:12px;font-size:.7rem;font-weight:700;letter-spacing:.5px;
+    color:var(--warn);background:rgba(255,179,71,.14);border:1px solid rgba(255,179,71,.4);
+    padding:3px 9px;border-radius:999px;}
   .mode-card .done-badge{
     position:absolute;top:12px;right:12px;font-size:.7rem;font-weight:700;letter-spacing:.5px;
     color:var(--good);background:rgba(49,208,170,.14);border:1px solid rgba(49,208,170,.4);
@@ -184,6 +199,23 @@
   .rev-filters .chk input{accent-color:var(--accent);width:16px;height:16px;}
   .rev-filters .rev-count{color:var(--text-dim);font-size:.85rem;margin-left:auto;}
 
+  /* 開放時間設定 */
+  .sched-box{border:1px solid var(--border);border-radius:12px;margin-top:6px;background:rgba(0,0,0,.12);overflow:hidden;}
+  .sched-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    background:transparent;border:none;color:var(--text);font-family:inherit;font-size:.95rem;font-weight:700;
+    padding:14px 16px;cursor:pointer;text-align:left;}
+  .sched-head:hover{background:rgba(255,255,255,.03);}
+  .sched-caret{color:var(--text-dim);font-size:.8rem;}
+  .sched-body{padding:0 16px 16px;}
+  .sched-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--border);}
+  .sched-row:first-of-type{border-top:none;}
+  .sched-row .sname{flex:1 1 180px;font-weight:600;font-size:.9rem;}
+  .sched-row label{color:var(--text-dim);font-size:.82rem;display:inline-flex;align-items:center;gap:6px;}
+  .sched-row input[type=date]{background:rgba(0,0,0,.25);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:7px 10px;font-family:inherit;font-size:.85rem;}
+  .sched-row input[type=date]:focus{outline:none;border-color:var(--accent);}
+  .sched-row input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1) opacity(.65);cursor:pointer;}
+
   /* grade panel */
   .grade-q{border:1px solid var(--border);background:rgba(0,0,0,.15);border-radius:12px;padding:16px;margin-top:12px;}
   .grade-q .rv-q{font-weight:600;}
@@ -194,11 +226,11 @@
     border-left:3px solid var(--accent);padding:8px 12px;border-radius:6px;font-size:.88rem;white-space:pre-wrap;}
   .grade-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;}
   .mark-toggle{display:flex;gap:8px;}
-  .mark{border:1px solid var(--border);background:rgba(0,0,0,.2);color:var(--text-dim);border-radius:10px;
+  .mark{border:2px solid var(--border);background:rgba(0,0,0,.2);color:var(--text-dim);border-radius:10px;
     padding:7px 14px;cursor:pointer;font-weight:700;font-size:.9rem;font-family:inherit;transition:.15s;}
   .mark:hover{border-color:var(--border-strong);}
-  .mark.ok.active{background:rgba(49,208,170,.18);color:var(--good);border-color:var(--good);}
-  .mark.no.active{background:rgba(255,93,108,.16);color:var(--bad);border-color:var(--bad);}
+  .mark.ok.active{background:rgba(49,208,170,.16);color:var(--good);border-color:var(--good);box-shadow:0 0 0 1px var(--good) inset;}
+  .mark.no.active{background:rgba(255,93,108,.14);color:var(--bad);border-color:var(--bad);box-shadow:0 0 0 1px var(--bad) inset;}
   .pts{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);font-size:.9rem;}
   .pts input{width:74px;padding:8px 10px;text-align:center;background:rgba(0,0,0,.25);
     border:1px solid var(--border);color:var(--text);border-radius:10px;font-family:inherit;font-size:.95rem;}
@@ -304,23 +336,8 @@
 
   <!-- ============ 審核者 ============ -->
   <section class="screen" id="screen-reviewer">
-    <!-- 通行碼驗證 -->
-    <div class="card" id="rev-auth">
-      <div class="q-head">
-        <div><div class="q-num">REVIEWER</div><h2>審核者驗證</h2></div>
-        <button class="btn ghost small" id="btn-auth-back">← 返回</button>
-      </div>
-      <p class="sub">請輸入審核者通行碼以載入作答與參考答案。</p>
-      <div class="field" style="max-width:340px;">
-        <label>審核者通行碼</label>
-        <input type="password" id="rev-token" placeholder="請輸入通行碼" autocomplete="off" />
-      </div>
-      <div class="btn-row"><button class="btn primary" id="btn-rev-auth">驗證並載入</button></div>
-      <div class="status" id="rev-auth-status"></div>
-    </div>
-
-    <!-- 清單（驗證後顯示） -->
-    <div class="card" id="rev-main" style="display:none;">
+    <!-- 清單 -->
+    <div class="card" id="rev-main">
       <div class="q-head">
         <div><div class="q-num">REVIEWER</div><h2>審核者模式 · 事後批改</h2></div>
         <div style="display:flex;gap:10px;">
@@ -328,6 +345,23 @@
           <button class="btn ghost small" id="btn-rev-back">← 返回</button>
         </div>
       </div>
+
+      <!-- 開放時間設定（可收合） -->
+      <div class="sched-box">
+        <button class="sched-head" id="sched-toggle" type="button">
+          <span>各模式開放作答時間</span>
+          <span class="sched-caret" id="sched-caret">▸</span>
+        </button>
+        <div class="sched-body" id="sched-body" style="display:none;">
+          <p class="sub" style="margin:0 0 8px;">設定開放起始日；留白＝不限制。選好日期會自動儲存並收合。</p>
+          <div id="sched-list"></div>
+          <div class="btn-row" style="margin-top:12px;">
+            <button class="btn small ghost" id="btn-sched-close" type="button">收合</button>
+            <span class="status" id="sched-status" style="margin:0;align-self:center;"></span>
+          </div>
+        </div>
+      </div>
+
       <div class="rev-filters">
         <select id="filter-mode"><option value="">全部模式</option></select>
         <select id="filter-sort">
@@ -471,6 +505,7 @@ let currentEmail = "";
 let currentMode = null;      // quiz key
 let answerStartISO = "";     // 首次作答時間（B 欄）
 let completedTitles = new Set(); // 該使用者已完成的模式（以 title 判定）
+let schedule = {};           // 各模式開放時間 { title:{start,end} }
 // 計時器（累計制：回上一頁編輯會續計）
 let timerRunning = false, timerStarted = false, runStart = 0, elapsedMs = 0, tickHandle = null;
 
@@ -508,7 +543,8 @@ function enterApp(){
   }
   renderModeGrid();               // 先畫（不阻塞）
   showScreen("screen-modes");
-  fetchCompletedStatus();         // 再非同步查已完成狀態，回來後重繪
+  fetchCompletedStatus();         // 查已完成狀態
+  fetchSchedule();                // 查各模式開放時間
 }
 
 function fetchCompletedStatus(){
@@ -520,6 +556,26 @@ function fetchCompletedStatus(){
   }).catch(()=>{ /* 查詢失敗就維持全部可作答，不打斷使用者 */ });
 }
 
+function fetchSchedule(){
+  jsonp({ action:"config" }).then(res=>{
+    if(res && res.ok && res.schedule){
+      schedule = res.schedule || {};
+      renderModeGrid();
+      if(typeof renderSchedEditor === "function") renderSchedEditor();
+    }
+  }).catch(()=>{ /* 取不到排程就視為全部開放 */ });
+}
+
+/* 判斷某模式目前是否開放；回傳 {open, reason} */
+function modeOpenState(title){
+  const s = schedule[title];
+  if(!s || !s.start) return { open:true };
+  const now = new Date();
+  const st = new Date(s.start + "T00:00:00");
+  if(now < st) return { open:false, reason:`${s.start} 起開放` };
+  return { open:true };
+}
+
 /* ==========================================================================
    7) 模式選擇
    ========================================================================== */
@@ -529,7 +585,20 @@ function renderModeGrid(){
   Object.keys(QUIZZES).forEach(key=>{
     const q = QUIZZES[key];
     const done = completedTitles.has(q.title);
+    const st = modeOpenState(q.title);
     const el = document.createElement("div");
+
+    if(!st.open){
+      el.className = "mode-card locked";
+      el.innerHTML = `
+        <span class="lock-badge">🔒 ${st.reason}</span>
+        <div class="tag">${q.tag}</div>
+        <div class="name">${q.title}</div>
+        <div class="meta">共 ${q.questions.length} 題 · 尚未開放</div>`;
+      grid.appendChild(el);
+      return;
+    }
+
     el.className = "mode-card" + (done ? " done" : "");
     el.innerHTML = `
       ${done ? '<span class="done-badge">✓ 已完成</span>' : ''}
@@ -778,13 +847,12 @@ document.getElementById("btn-home").addEventListener("click", ()=>{ showScreen("
    ========================================================================== */
 document.getElementById("btn-reviewer").addEventListener("click", openReviewer);
 document.getElementById("btn-rev-back").addEventListener("click", ()=>showScreen("screen-modes"));
-document.getElementById("btn-auth-back").addEventListener("click", ()=>showScreen("screen-modes"));
 document.getElementById("btn-refresh").addEventListener("click", loadSubmissions);
 document.getElementById("btn-grade-close").addEventListener("click", ()=>{
   document.getElementById("grade-panel").style.display = "none";
 });
-document.getElementById("btn-rev-auth").addEventListener("click", tryAuth);
-document.getElementById("rev-token").addEventListener("keydown", e=>{ if(e.key==="Enter") tryAuth(); });
+document.getElementById("btn-sched-close").addEventListener("click", collapseSched);
+document.getElementById("sched-toggle").addEventListener("click", toggleSched);
 // 篩選控制項變動即重繪
 ["filter-mode","filter-sort","filter-ungraded"].forEach(id=>{
   document.getElementById(id).addEventListener("change", renderReviewTable);
@@ -792,46 +860,68 @@ document.getElementById("rev-token").addEventListener("keydown", e=>{ if(e.key==
 
 let currentGradeItem = null;
 let reviewItems = [];
-let reviewerToken = "";   // 通過驗證後暫存於本次工作階段（不寫進原始碼）
 let answerKeys = {};      // 由伺服器回傳的參考答案，僅審核者取得
 
 function openReviewer(){
   showScreen("screen-reviewer");
   document.getElementById("grade-panel").style.display = "none";
-  if(reviewerToken){
-    // 本階段已驗證過，直接進清單
-    document.getElementById("rev-auth").style.display = "none";
-    document.getElementById("rev-main").style.display = "block";
-    loadSubmissions();
-  } else {
-    document.getElementById("rev-auth").style.display = "block";
-    document.getElementById("rev-main").style.display = "none";
-    document.getElementById("rev-token").value = "";
-    document.getElementById("rev-auth-status").textContent = "";
-    document.getElementById("rev-auth-status").className = "status";
-  }
+  renderSchedEditor();
+  collapseSched();
+  loadSubmissions();
 }
 
-function tryAuth(){
-  const token = document.getElementById("rev-token").value.trim();
-  const status = document.getElementById("rev-auth-status");
-  if(!token){ status.className="status err"; status.textContent="請輸入通行碼"; return; }
-  status.className="status"; status.textContent="驗證中…";
-  jsonp({ action:"list", email: currentEmail, token: token }).then(res=>{
-    if(res && res.ok){
-      reviewerToken = token;
-      answerKeys = res.keys || {};
-      reviewItems = res.items || [];
-      document.getElementById("rev-auth").style.display = "none";
-      document.getElementById("rev-main").style.display = "block";
-      populateModeFilter();
-      renderReviewTable();
-    } else if(res && res.error === "unauthorized"){
-      status.className="status err"; status.textContent="通行碼錯誤,請再試一次。";
-    } else {
-      throw new Error(res && res.error ? res.error : "載入失敗");
-    }
-  }).catch(err=>{ status.className="status err"; status.textContent="失敗:"+err.message; });
+/* 收合／展開排程區 */
+function toggleSched(){
+  const body = document.getElementById("sched-body");
+  if(body.style.display === "none") expandSched(); else collapseSched();
+}
+function expandSched(){
+  document.getElementById("sched-body").style.display = "block";
+  document.getElementById("sched-caret").textContent = "▾";
+}
+function collapseSched(){
+  document.getElementById("sched-body").style.display = "none";
+  document.getElementById("sched-caret").textContent = "▸";
+}
+
+/* 開放時間設定：列出各模式的開始日期輸入 */
+function renderSchedEditor(){
+  const box = document.getElementById("sched-list");
+  if(!box) return;
+  box.innerHTML = "";
+  Object.keys(QUIZZES).forEach(key=>{
+    const q = QUIZZES[key];
+    const s = schedule[q.title] || {};
+    const row = document.createElement("div");
+    row.className = "sched-row";
+    row.innerHTML = `
+      <span class="sname">${escapeHtml(q.tag)}｜${escapeHtml(q.title)}</span>
+      <label>開放起始日 <input type="date" data-title="${escapeHtml(q.title)}" value="${s.start||""}"></label>`;
+    const inp = row.querySelector("input");
+    inp.addEventListener("click", ()=>{ try{ inp.showPicker(); }catch(e){} }); // 點擊即開小日曆
+    inp.addEventListener("change", ()=>saveSchedule(true));                    // 選好即存並收合
+    box.appendChild(row);
+  });
+}
+
+/* collapseAfter=true 時，儲存成功後自動收合 */
+function saveSchedule(collapseAfter){
+  const status = document.getElementById("sched-status");
+  const obj = {};
+  document.querySelectorAll("#sched-list input[type=date]").forEach(inp=>{
+    const title = inp.getAttribute("data-title");
+    if(inp.value) obj[title] = { start: inp.value };
+  });
+  status.className="status"; status.textContent="儲存中…";
+  jsonp({ action:"setschedule", reviewer: currentEmail, schedule: JSON.stringify(obj) }).then(res=>{
+    if(!res || !res.ok) throw new Error(res && res.error ? res.error : "儲存失敗");
+    schedule = obj;
+    status.className="status ok"; status.textContent="✓ 已儲存";
+    renderModeGrid();
+    if(collapseAfter) setTimeout(collapseSched, 400);
+  }).catch(err=>{
+    status.className="status err"; status.textContent="失敗:"+err.message;
+  });
 }
 
 function loadSubmissions(){
@@ -839,8 +929,8 @@ function loadSubmissions(){
   body.innerHTML = `<tr><td colspan="7" class="loading">載入中…</td></tr>`;
   document.getElementById("grade-panel").style.display = "none";
 
-  jsonp({ action:"list", email: currentEmail, token: reviewerToken }).then(res=>{
-    if(!res || !res.ok) throw new Error(res && res.error ? res.error : "讀取失敗");
+  jsonp({ action:"list", reviewer: currentEmail }).then(res=>{
+    if(!res || !res.ok) throw new Error(res && res.error === "unauthorized" ? "無審核權限" : (res && res.error ? res.error : "讀取失敗"));
     answerKeys = res.keys || answerKeys;
     reviewItems = res.items || [];
     populateModeFilter();
@@ -965,7 +1055,7 @@ document.getElementById("btn-grade-save").addEventListener("click", ()=>{
   const score = document.getElementById("grade-total").textContent.trim();
   if(!currentGradeItem) return;
   btn.disabled = true; status.className="status"; status.textContent="儲存中…";
-  jsonp({ action:"grade", email: currentEmail, token: reviewerToken, id: currentGradeItem.id, mode: currentGradeItem.mode, score: score }).then(res=>{
+  jsonp({ action:"grade", reviewer: currentEmail, email: currentGradeItem.email, datetime: currentGradeItem.datetime, mode: currentGradeItem.mode, score: score }).then(res=>{
     if(!res || !res.ok) throw new Error(res && res.error ? res.error : "寫入失敗");
     status.className="status ok"; status.textContent=`✓ 已將 ${score} 分寫入(總表＋模式分頁)`;
     btn.disabled=false;
