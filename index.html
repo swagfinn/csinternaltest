@@ -190,6 +190,8 @@
   .grade-q .stu-a{margin-top:8px;color:var(--text-dim);white-space:pre-wrap;background:rgba(255,255,255,.03);
     border-left:3px solid var(--border-strong);padding:8px 12px;border-radius:6px;font-size:.9rem;}
   .grade-q .stu-a.empty{color:var(--warn);border-left-color:var(--warn);}
+  .grade-q .ref-a{margin-top:8px;color:#8fb8ff;background:rgba(79,140,255,.1);
+    border-left:3px solid var(--accent);padding:8px 12px;border-radius:6px;font-size:.88rem;white-space:pre-wrap;}
   .grade-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;}
   .mark-toggle{display:flex;gap:8px;}
   .mark{border:1px solid var(--border);background:rgba(0,0,0,.2);color:var(--text-dim);border-radius:10px;
@@ -302,7 +304,23 @@
 
   <!-- ============ 審核者 ============ -->
   <section class="screen" id="screen-reviewer">
-    <div class="card">
+    <!-- 通行碼驗證 -->
+    <div class="card" id="rev-auth">
+      <div class="q-head">
+        <div><div class="q-num">REVIEWER</div><h2>審核者驗證</h2></div>
+        <button class="btn ghost small" id="btn-auth-back">← 返回</button>
+      </div>
+      <p class="sub">請輸入審核者通行碼以載入作答與參考答案。</p>
+      <div class="field" style="max-width:340px;">
+        <label>審核者通行碼</label>
+        <input type="password" id="rev-token" placeholder="請輸入通行碼" autocomplete="off" />
+      </div>
+      <div class="btn-row"><button class="btn primary" id="btn-rev-auth">驗證並載入</button></div>
+      <div class="status" id="rev-auth-status"></div>
+    </div>
+
+    <!-- 清單（驗證後顯示） -->
+    <div class="card" id="rev-main" style="display:none;">
       <div class="q-head">
         <div><div class="q-num">REVIEWER</div><h2>審核者模式 · 事後批改</h2></div>
         <div style="display:flex;gap:10px;">
@@ -361,33 +379,73 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbwoz4HHhlN1p86hoAjfYd5P
 const REVIEWER_EMAIL = "fin.chang@swag.live"; // 具審核者權限的帳號
 
 /* ==========================================================================
-   2) 題庫：日後新增模式，只要往這個物件加一組即可（前端會自動渲染）
+   2) 題庫：前端只放「題目/選項」，不含任何答案（答案由 GAS 伺服器端保管）
       type: "single"(單選) | "multiple"(複選) | "short"(簡答)
+      注意：新增或調整題目時，GAS 的 ANSWER_KEYS 需同步對應（同順序）
    ========================================================================== */
 const QUIZZES = {
   mode1: {
     tag: "模式一",
-    title: "騙點概念基礎練習",
+    title: "MOOR基礎篇-一般功能1",
     questions: [
-      {
-        id: "Q1",
-        type: "single",
-        text: "用戶檢舉主播表演不符、情緒激動要求退鑽。下列何者最能代表客服處理此類案件的正確起點心態?",
-        options: [
-          "用戶不滿就應盡快退鑽,維護體驗",
-          "原則上不退,只有符合條件(主播違規或系統異常)時才可能退",
-          "一律先送審團決定",
-          "先看用戶消費等級高低再決定"
-        ]
-      },
-      {
-        id: "Q2",
-        type: "short",
-        text: "用戶檢舉解鎖到完全相同的兩則貼文。情況一:兩則都是「限時動態」,較新那則發布於 30 小時前。情況二:兩則是一般(非限時)貼文。兩種情況的處置差別是什麼?"
-      }
+      { id:"Q1", type:"short",
+        text:"私訊聊天室中，用戶每發一句就收取一次「回覆鑽石」，此設定在哪裡調整？" },
+      { id:"Q2", type:"short",
+        text:"主播詢問：個人化任務要發布的是「短影音」，該怎麼操作才能正確完成任務？請寫出正確的操作步驟。" },
+      { id:"Q3", type:"single",
+        text:"主播想在一則貼文中一次發布多張照片，正確操作與上限為？",
+        options:[
+          "發布內容 → 直接連選照片，最多 3 張",
+          "發布內容 → 選取「多張」→ 再選照片，最多 3 張",
+          "發布內容 → 直接連選照片，最多 10 張",
+          "發布內容 → 選取「多張」→ 再選照片，最多 10 張"
+        ] },
+      { id:"Q4", type:"short",
+        text:"如何查看「直播紀錄」頁面？" },
+      { id:"Q5", type:"single",
+        text:"AI直播精華系統自動剪輯的片段會保留幾天？",
+        options:["3 天","7 天","14 天","30 天"] }
+    ]
+  },
+  mode2: {
+    tag: "模式二",
+    title: "MOOR基礎篇-一般功能2",
+    questions: [
+      { id:"Q1", type:"single",
+        text:"主播想關閉 MOOR 的「AI 剪輯精華」功能，正確操作為？",
+        options:[
+          "個人中心 → 更多功能 → 設定 → 關閉 AI 剪輯精華",
+          "無法自行關閉，需聯繫 TM",
+          "開播 → 直播資訊設定頁面 → 進階服務：AI 剪輯精華，點擊按鈕反灰"
+        ] },
+      { id:"Q2", type:"short",
+        text:"主播想在 MOOR APP 查看「主播活動」，請說明查看路徑（提供兩種）。" },
+      { id:"Q3", type:"single",
+        text:"數據分析「自訂天數」最多可拉幾天？超過需透過 TM 協助查詢？",
+        options:["30 天","44 天","66 天","90 天"] },
+      { id:"Q4", type:"short",
+        text:"主播正在開「語音直播」，想中途切換成「一對多」模式，該怎麼操作？" },
+      { id:"Q5", type:"short",
+        text:"主播要於 MOOR APP 中查找「日誌」頁面，該怎麼操作？" }
+    ]
+  },
+  mode3: {
+    tag: "模式三",
+    title: "MOOR基礎篇-一般功能3",
+    questions: [
+      { id:"Q1", type:"short",
+        text:"主播端中的「神奇按鈕」（清除快取）在哪裡？" },
+      { id:"Q2", type:"short",
+        text:"主播想查看自己的「推薦碼」（推薦朋友當主播），路徑是？" },
+      { id:"Q3", type:"single",
+        text:"主播個人化指定指令數量上限為幾個？",
+        options:["5 個","10 個","20 個","無上限"] },
+      { id:"Q4", type:"short",
+        text:"主播想解除對某位觀眾的封鎖，該怎麼操作？" },
+      { id:"Q5", type:"short",
+        text:"主播的貼文被 DENY 扣分下架，要在哪查看「加扣分明細及原因」？" }
     ]
   }
-  // mode2: { tag:"模式二", title:"...", questions:[...] },
 };
 
 /* ==========================================================================
@@ -720,10 +778,13 @@ document.getElementById("btn-home").addEventListener("click", ()=>{ showScreen("
    ========================================================================== */
 document.getElementById("btn-reviewer").addEventListener("click", openReviewer);
 document.getElementById("btn-rev-back").addEventListener("click", ()=>showScreen("screen-modes"));
+document.getElementById("btn-auth-back").addEventListener("click", ()=>showScreen("screen-modes"));
 document.getElementById("btn-refresh").addEventListener("click", loadSubmissions);
 document.getElementById("btn-grade-close").addEventListener("click", ()=>{
   document.getElementById("grade-panel").style.display = "none";
 });
+document.getElementById("btn-rev-auth").addEventListener("click", tryAuth);
+document.getElementById("rev-token").addEventListener("keydown", e=>{ if(e.key==="Enter") tryAuth(); });
 // 篩選控制項變動即重繪
 ["filter-mode","filter-sort","filter-ungraded"].forEach(id=>{
   document.getElementById(id).addEventListener("change", renderReviewTable);
@@ -731,10 +792,46 @@ document.getElementById("btn-grade-close").addEventListener("click", ()=>{
 
 let currentGradeItem = null;
 let reviewItems = [];
+let reviewerToken = "";   // 通過驗證後暫存於本次工作階段（不寫進原始碼）
+let answerKeys = {};      // 由伺服器回傳的參考答案，僅審核者取得
 
 function openReviewer(){
   showScreen("screen-reviewer");
-  loadSubmissions();
+  document.getElementById("grade-panel").style.display = "none";
+  if(reviewerToken){
+    // 本階段已驗證過，直接進清單
+    document.getElementById("rev-auth").style.display = "none";
+    document.getElementById("rev-main").style.display = "block";
+    loadSubmissions();
+  } else {
+    document.getElementById("rev-auth").style.display = "block";
+    document.getElementById("rev-main").style.display = "none";
+    document.getElementById("rev-token").value = "";
+    document.getElementById("rev-auth-status").textContent = "";
+    document.getElementById("rev-auth-status").className = "status";
+  }
+}
+
+function tryAuth(){
+  const token = document.getElementById("rev-token").value.trim();
+  const status = document.getElementById("rev-auth-status");
+  if(!token){ status.className="status err"; status.textContent="請輸入通行碼"; return; }
+  status.className="status"; status.textContent="驗證中…";
+  jsonp({ action:"list", email: currentEmail, token: token }).then(res=>{
+    if(res && res.ok){
+      reviewerToken = token;
+      answerKeys = res.keys || {};
+      reviewItems = res.items || [];
+      document.getElementById("rev-auth").style.display = "none";
+      document.getElementById("rev-main").style.display = "block";
+      populateModeFilter();
+      renderReviewTable();
+    } else if(res && res.error === "unauthorized"){
+      status.className="status err"; status.textContent="通行碼錯誤,請再試一次。";
+    } else {
+      throw new Error(res && res.error ? res.error : "載入失敗");
+    }
+  }).catch(err=>{ status.className="status err"; status.textContent="失敗:"+err.message; });
 }
 
 function loadSubmissions(){
@@ -742,8 +839,9 @@ function loadSubmissions(){
   body.innerHTML = `<tr><td colspan="7" class="loading">載入中…</td></tr>`;
   document.getElementById("grade-panel").style.display = "none";
 
-  jsonp({ action:"list", email: currentEmail }).then(res=>{
+  jsonp({ action:"list", email: currentEmail, token: reviewerToken }).then(res=>{
     if(!res || !res.ok) throw new Error(res && res.error ? res.error : "讀取失敗");
+    answerKeys = res.keys || answerKeys;
     reviewItems = res.items || [];
     populateModeFilter();
     renderReviewTable();
@@ -811,14 +909,17 @@ function openGrade(item){
 
   const detail = document.getElementById("grade-detail");
   detail.innerHTML = "";
+  const refList = answerKeys[item.mode] || [];
   answers.forEach((ans, i)=>{
     const qtext = (quiz && quiz.questions[i]) ? quiz.questions[i].text : `第 ${i+1} 題`;
+    const refAns = (refList[i] !== undefined && refList[i] !== null) ? String(refList[i]) : "";
     const filled = ans !== "" && ans !== null && ans !== undefined;
     const row = document.createElement("div");
     row.className = "grade-q";
     row.innerHTML = `
       <div class="rv-q">Q${i+1}. ${escapeHtml(String(qtext))}</div>
       <div class="stu-a ${filled?'':'empty'}">${filled ? escapeHtml(String(ans)) : "（未作答）"}</div>
+      ${refAns ? `<div class="ref-a"><b>參考答案：</b>${escapeHtml(refAns)}</div>` : ""}
       <div class="grade-controls">
         <div class="mark-toggle">
           <button type="button" class="mark ok" data-mark="ok">✓ 正確</button>
@@ -864,7 +965,7 @@ document.getElementById("btn-grade-save").addEventListener("click", ()=>{
   const score = document.getElementById("grade-total").textContent.trim();
   if(!currentGradeItem) return;
   btn.disabled = true; status.className="status"; status.textContent="儲存中…";
-  jsonp({ action:"grade", email: currentEmail, id: currentGradeItem.id, mode: currentGradeItem.mode, score: score }).then(res=>{
+  jsonp({ action:"grade", email: currentEmail, token: reviewerToken, id: currentGradeItem.id, mode: currentGradeItem.mode, score: score }).then(res=>{
     if(!res || !res.ok) throw new Error(res && res.error ? res.error : "寫入失敗");
     status.className="status ok"; status.textContent=`✓ 已將 ${score} 分寫入(總表＋模式分頁)`;
     btn.disabled=false;
