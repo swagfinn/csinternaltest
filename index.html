@@ -353,7 +353,7 @@
           <span class="sched-caret" id="sched-caret">▸</span>
         </button>
         <div class="sched-body" id="sched-body" style="display:none;">
-          <p class="sub" style="margin:0 0 8px;">設定開放起始日；留白＝不限制。選好日期會自動儲存並收合。</p>
+          <p class="sub" style="margin:0 0 8px;">設定開放起始日；留白＝不限制。選好日期會自動儲存,展開後會保持展開,直到按「收合」為止。</p>
           <div id="sched-list"></div>
           <div class="btn-row" style="margin-top:12px;">
             <button class="btn small ghost" id="btn-sched-close" type="button">收合</button>
@@ -899,7 +899,7 @@ function renderSchedEditor(){
       <label>開放起始日 <input type="date" data-title="${escapeHtml(q.title)}" value="${s.start||""}"></label>`;
     const inp = row.querySelector("input");
     inp.addEventListener("click", ()=>{ try{ inp.showPicker(); }catch(e){} }); // 點擊即開小日曆
-    inp.addEventListener("change", ()=>saveSchedule(true));                    // 選好即存並收合
+    inp.addEventListener("change", ()=>saveSchedule(false));                   // 選好即存，但不自動收合
     box.appendChild(row);
   });
 }
@@ -989,7 +989,8 @@ function openGrade(item){
   const quiz = Object.values(QUIZZES).find(q => q.title === item.mode);
   const modeName = item.mode || "未知模式";
   const answers = item.answers || [];
-  const n = answers.length;
+  // 以「該模式實際題數」為準；模式未知時才退回用作答數量
+  const n = quiz ? quiz.questions.length : answers.length;
 
   document.getElementById("grade-title").textContent = `「${modeName}」批改`;
   document.getElementById("grade-sub").textContent =
@@ -1000,7 +1001,8 @@ function openGrade(item){
   const detail = document.getElementById("grade-detail");
   detail.innerHTML = "";
   const refList = answerKeys[item.mode] || [];
-  answers.forEach((ans, i)=>{
+  for(let i=0;i<n;i++){
+    const ans = answers[i];
     const qtext = (quiz && quiz.questions[i]) ? quiz.questions[i].text : `第 ${i+1} 題`;
     const refAns = (refList[i] !== undefined && refList[i] !== null) ? String(refList[i]) : "";
     const filled = ans !== "" && ans !== null && ans !== undefined;
@@ -1025,7 +1027,7 @@ function openGrade(item){
     noBtn.addEventListener("click", ()=>{ noBtn.classList.add("active"); okBtn.classList.remove("active"); recomputeGradeTotal(); });
     row.querySelector(".q-points").addEventListener("input", recomputeGradeTotal);
     detail.appendChild(row);
-  });
+  }
 
   recomputeGradeTotal();
   document.getElementById("grade-status").textContent = "";
