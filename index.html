@@ -235,6 +235,7 @@
     padding:7px 14px;cursor:pointer;font-weight:700;font-size:.9rem;font-family:inherit;transition:.15s;}
   .mark:hover{border-color:var(--border-strong);}
   .mark.ok.active{background:rgba(49,208,170,.16);color:var(--good);border-color:var(--good);box-shadow:0 0 0 1px var(--good) inset;}
+  .mark.half.active{background:rgba(255,179,71,.16);color:var(--warn);border-color:var(--warn);box-shadow:0 0 0 1px var(--warn) inset;}
   .mark.no.active{background:rgba(255,93,108,.14);color:var(--bad);border-color:var(--bad);box-shadow:0 0 0 1px var(--bad) inset;}
   .pts{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);font-size:.9rem;}
   .pts input{width:74px;padding:8px 10px;text-align:center;background:rgba(0,0,0,.25);
@@ -1033,18 +1034,39 @@ function openGrade(item){
       ${refAns ? `<div class="ref-a"><b>參考答案：</b>${escapeHtml(refAns)}</div>` : ""}
       <div class="grade-controls">
         <div class="mark-toggle">
-          <button type="button" class="mark ok" data-mark="ok">✓ 正確</button>
-          <button type="button" class="mark no" data-mark="no">✗ 錯誤</button>
+          <button type="button" class="mark ok">✓ 正確</button>
+          <button type="button" class="mark half">◐ 半對</button>
+          <button type="button" class="mark no">✗ 錯誤</button>
         </div>
         <label class="pts">配分 <input type="number" class="q-points" min="0" step="1" value="${defaultPts}"> 分</label>
+        <label class="pts half-wrap" style="display:none;">得分 <input type="number" class="q-half" min="0" step="1"> 分</label>
       </div>
       <input type="text" class="q-comment" placeholder="批改說明(選填)" />`;
 
     const okBtn = row.querySelector(".mark.ok");
+    const halfBtn = row.querySelector(".mark.half");
     const noBtn = row.querySelector(".mark.no");
-    okBtn.addEventListener("click", ()=>{ okBtn.classList.add("active"); noBtn.classList.remove("active"); recomputeGradeTotal(); });
-    noBtn.addEventListener("click", ()=>{ noBtn.classList.add("active"); okBtn.classList.remove("active"); recomputeGradeTotal(); });
-    row.querySelector(".q-points").addEventListener("input", recomputeGradeTotal);
+    const halfWrap = row.querySelector(".half-wrap");
+    const halfInput = row.querySelector(".q-half");
+    const ptsInput = row.querySelector(".q-points");
+
+    function setState(state){
+      okBtn.classList.toggle("active", state==="ok");
+      halfBtn.classList.toggle("active", state==="half");
+      noBtn.classList.toggle("active", state==="no");
+      halfWrap.style.display = state==="half" ? "inline-flex" : "none";
+      if(state==="half" && halfInput.value===""){
+        const p = parseFloat(ptsInput.value) || 0;
+        halfInput.value = Math.round(p/2);   // 預設一半，可自行調整
+      }
+      recomputeGradeTotal();
+      if(state==="half") halfInput.focus();
+    }
+    okBtn.addEventListener("click", ()=>setState("ok"));
+    halfBtn.addEventListener("click", ()=>setState("half"));
+    noBtn.addEventListener("click", ()=>setState("no"));
+    halfInput.addEventListener("input", recomputeGradeTotal);
+    ptsInput.addEventListener("input", recomputeGradeTotal);
     detail.appendChild(row);
   }
 
@@ -1055,15 +1077,22 @@ function openGrade(item){
   panel.scrollIntoView({behavior:"smooth", block:"start"});
 }
 
-// 加總「打勾(✓ 正確)」題目的配分 = 試卷得分；同時顯示滿分
+// 試卷得分 = 每題實得分加總：✓=配分、半對=輸入分(不超過配分)、✗/未選=0
 function recomputeGradeTotal(){
   let total = 0, max = 0;
   document.querySelectorAll("#grade-detail .grade-q").forEach(row=>{
     const pts = parseFloat(row.querySelector(".q-points").value) || 0;
     max += pts;
-    if(row.querySelector(".mark.ok").classList.contains("active")) total += pts;
+    if(row.querySelector(".mark.ok").classList.contains("active")){
+      total += pts;
+    } else if(row.querySelector(".mark.half").classList.contains("active")){
+      let h = parseFloat(row.querySelector(".q-half").value) || 0;
+      if(h < 0) h = 0;
+      if(h > pts) h = pts;   // 半對得分不超過該題配分
+      total += h;
+    }
+    // ✗ 錯誤 / 未選 → 0
   });
-  // 去除浮點誤差
   total = Math.round(total * 100) / 100;
   max = Math.round(max * 100) / 100;
   document.getElementById("grade-total").textContent = total;
