@@ -138,6 +138,11 @@
   .q-num{font-weight:800;color:var(--accent);font-size:.9rem;letter-spacing:1px;}
   .q-type{font-size:.72rem;color:var(--text-dim);border:1px solid var(--border);padding:3px 10px;border-radius:999px;}
   .q-text{margin-top:12px;font-size:1.02rem;font-weight:500;white-space:pre-wrap;}
+  .q-link{display:inline-block;margin-top:10px;color:var(--accent);font-size:.9rem;text-decoration:none;
+    border:1px solid var(--border);border-radius:8px;padding:6px 12px;transition:.15s;word-break:break-all;}
+  .q-link:hover{border-color:var(--accent);background:rgba(79,140,255,.1);}
+  .btn.danger{border-color:rgba(255,93,108,.4);color:var(--bad);}
+  .btn.danger:hover{border-color:var(--bad);background:rgba(255,93,108,.12);}
   .options{margin-top:16px;display:flex;flex-direction:column;gap:10px;}
   .opt{
     display:flex;align-items:flex-start;gap:12px;cursor:pointer;
@@ -453,7 +458,8 @@ const QUIZZES = {
           "開播 → 直播資訊設定頁面 → 進階服務：AI 剪輯精華，點擊按鈕反灰"
         ] },
       { id:"Q2", type:"short",
-        text:"主播想在 MOOR APP 查看「主播活動」，請說明查看路徑（提供兩種）。" },
+        text:"主播想在 MOOR APP 查看「主播活動」，請說明查看路徑（提供兩種）。",
+        link:"https://creators.swag.live/" },
       { id:"Q3", type:"single",
         text:"數據分析「自訂天數」最多可拉幾天？超過需透過 TM 協助查詢？",
         options:["30 天","44 天","66 天","90 天"] },
@@ -642,7 +648,8 @@ function startQuiz(key){
         <span class="q-num">Q${i+1}</span>
         <span class="q-type">${typeLabel[q.type]||q.type}</span>
       </div>
-      <div class="q-text">${escapeHtml(q.text)}</div>`;
+      <div class="q-text">${escapeHtml(q.text)}</div>
+      ${q.link ? `<a class="q-link" href="${escapeHtml(q.link)}" target="_blank" rel="noopener">🔗 參考網址：${escapeHtml(q.link)}</a>` : ""}`;
 
     if(q.type === "single" || q.type === "multiple"){
       const inputType = q.type === "single" ? "radio" : "checkbox";
@@ -927,7 +934,6 @@ function saveSchedule(collapseAfter){
 function loadSubmissions(){
   const body = document.getElementById("rev-body");
   body.innerHTML = `<tr><td colspan="7" class="loading">載入中…</td></tr>`;
-  document.getElementById("grade-panel").style.display = "none";
 
   jsonp({ action:"list", reviewer: currentEmail }).then(res=>{
     if(!res || !res.ok) throw new Error(res && res.error === "unauthorized" ? "無審核權限" : (res && res.error ? res.error : "讀取失敗"));
@@ -977,10 +983,23 @@ function renderReviewTable(){
       <td>${escapeHtml(String(it.mode||""))}</td>
       <td>${escapeHtml(String(it.duration||""))}</td>
       <td><span class="score-pill ${scored?"":"empty"}">${scored?escapeHtml(String(it.score)):"未評"}</span></td>
-      <td><button class="btn small">批改</button></td>`;
-    tr.querySelector("button").addEventListener("click", ()=>openGrade(it));
+      <td style="white-space:nowrap;">
+        <button class="btn small btn-grade">批改</button>
+        <button class="btn small danger btn-del" title="刪除這筆作答">🗑</button>
+      </td>`;
+    tr.querySelector(".btn-grade").addEventListener("click", ()=>openGrade(it));
+    tr.querySelector(".btn-del").addEventListener("click", ()=>deleteSubmission(it));
     body.appendChild(tr);
   });
+}
+
+function deleteSubmission(item){
+  if(!confirm(`確定刪除這筆作答?（無法復原）\n\n${item.email}\n${item.mode}\n${item.datetime}\n\n總表與模式分頁都會一併移除。`)) return;
+  jsonp({ action:"delete", reviewer: currentEmail, email:item.email, datetime:item.datetime, mode:item.mode }).then(res=>{
+    if(!res || !res.ok) throw new Error(res && res.error ? res.error : "刪除失敗");
+    if(res.deleted === 0){ alert("找不到對應紀錄,可能是舊格式資料,請直接於 Google Sheet 手動刪除。"); }
+    loadSubmissions();
+  }).catch(err=>{ alert("刪除失敗:"+err.message); });
 }
 
 function openGrade(item){
