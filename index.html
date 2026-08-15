@@ -143,6 +143,9 @@
   .q-link:hover{border-color:var(--accent);background:rgba(79,140,255,.1);}
   .btn.danger{border-color:rgba(255,93,108,.4);color:var(--bad);}
   .btn.danger:hover{border-color:var(--bad);background:rgba(255,93,108,.12);}
+  .btn.graded{border-color:rgba(49,208,170,.5);color:var(--good);background:rgba(49,208,170,.1);}
+  .btn.graded:hover{border-color:var(--good);background:rgba(49,208,170,.18);}
+  #grade-capture{background:var(--bg-1);border-radius:12px;padding:4px;}
   .options{margin-top:16px;display:flex;flex-direction:column;gap:10px;}
   .opt{
     display:flex;align-items:flex-start;gap:12px;cursor:pointer;
@@ -389,21 +392,24 @@
 
     <!-- 批改單筆 -->
     <div class="card" id="grade-panel" style="display:none;">
-      <div class="q-head">
-        <div>
-          <h2 id="grade-title">批改</h2>
-          <p class="sub" id="grade-sub"></p>
+      <div id="grade-capture">
+        <div class="q-head">
+          <div>
+            <h2 id="grade-title">批改</h2>
+            <p class="sub" id="grade-sub"></p>
+          </div>
+          <button class="btn ghost small" id="btn-grade-close">關閉</button>
         </div>
-        <button class="btn ghost small" id="btn-grade-close">關閉</button>
+        <div id="grade-detail"></div>
+        <div class="grade-total-bar">
+          <div class="gt-label">試卷得分</div>
+          <div class="gt-value"><span id="grade-total">0</span><span class="gt-unit"> 分</span>
+            <span class="sub" id="grade-maxnote"></span></div>
+        </div>
       </div>
-      <div id="grade-detail"></div>
-      <div class="grade-total-bar">
-        <div class="gt-label">試卷得分</div>
-        <div class="gt-value"><span id="grade-total">0</span><span class="gt-unit"> 分</span>
-          <span class="sub" id="grade-maxnote"></span></div>
-      </div>
-      <div class="btn-row">
+      <div class="btn-row" id="grade-actions">
         <button class="btn primary" id="btn-grade-save">儲存得分</button>
+        <button class="btn ghost" id="btn-grade-shot">📋 複製批改截圖</button>
       </div>
       <div class="status" id="grade-status"></div>
     </div>
@@ -985,7 +991,7 @@ function renderReviewTable(){
       <td>${escapeHtml(String(it.duration||""))}</td>
       <td><span class="score-pill ${scored?"":"empty"}">${scored?escapeHtml(String(it.score)):"未評"}</span></td>
       <td style="white-space:nowrap;">
-        <button class="btn small btn-grade">批改</button>
+        <button class="btn small btn-grade ${scored?"graded":""}">${scored?"✓ 已批改":"批改"}</button>
         <button class="btn small danger btn-del" title="刪除這筆作答">🗑</button>
       </td>`;
     tr.querySelector(".btn-grade").addEventListener("click", ()=>openGrade(it));
@@ -1021,6 +1027,7 @@ function openGrade(item){
   const detail = document.getElementById("grade-detail");
   detail.innerHTML = "";
   const refList = answerKeys[item.mode] || [];
+  const saved = Array.isArray(item.gradeDetail) ? item.gradeDetail : null; // 先前批改明細
   for(let i=0;i<n;i++){
     const ans = answers[i];
     const qtext = (quiz && quiz.questions[i]) ? quiz.questions[i].text : `第 ${i+1} 題`;
@@ -1049,6 +1056,7 @@ function openGrade(item){
     const halfWrap = row.querySelector(".half-wrap");
     const halfInput = row.querySelector(".q-half");
     const ptsInput = row.querySelector(".q-points");
+    const commentInput = row.querySelector(".q-comment");
 
     function setState(state){
       okBtn.classList.toggle("active", state==="ok");
@@ -1067,6 +1075,20 @@ function openGrade(item){
     noBtn.addEventListener("click", ()=>setState("no"));
     halfInput.addEventListener("input", recomputeGradeTotal);
     ptsInput.addEventListener("input", recomputeGradeTotal);
+
+    // 還原先前批改（不觸發 focus）
+    if(saved && saved[i]){
+      const d = saved[i];
+      if(d.points !== undefined && d.points !== "") ptsInput.value = d.points;
+      if(d.comment) commentInput.value = d.comment;
+      if(d.state === "ok") okBtn.classList.add("active");
+      else if(d.state === "no") noBtn.classList.add("active");
+      else if(d.state === "half"){
+        halfBtn.classList.add("active");
+        halfWrap.style.display = "inline-flex";
+        halfInput.value = (d.half !== undefined && d.half !== "") ? d.half : Math.round((parseFloat(ptsInput.value)||0)/2);
+      }
+    }
     detail.appendChild(row);
   }
 
@@ -1099,15 +1121,35 @@ function recomputeGradeTotal(){
   document.getElementById("grade-maxnote").textContent = `滿分 ${max} 分`;
 }
 
+// 收集目前批改明細（供儲存與截圖）
+function collectGradeDetail(){
+  const detail = [];
+  document.querySelectorAll("#grade-detail .grade-q").forEach(row=>{
+    let state = "";
+    if(row.querySelector(".mark.ok").classList.contains("active")) state = "ok";
+    else if(row.querySelector(".mark.half").classList.contains("active")) state = "half";
+    else if(row.querySelector(".mark.no").classList.contains("active")) state = "no";
+    detail.push({
+      state: state,
+      points: parseFloat(row.querySelector(".q-points").value) || 0,
+      half: row.querySelector(".q-half").value,
+      comment: row.querySelector(".q-comment").value
+    });
+  });
+  return detail;
+}
+
 document.getElementById("btn-grade-save").addEventListener("click", ()=>{
   const btn = document.getElementById("btn-grade-save");
   const status = document.getElementById("grade-status");
   const score = document.getElementById("grade-total").textContent.trim();
   if(!currentGradeItem) return;
+  const detail = JSON.stringify(collectGradeDetail());
   btn.disabled = true; status.className="status"; status.textContent="儲存中…";
-  jsonp({ action:"grade", reviewer: currentEmail, totalRow: currentGradeItem.totalRow, modeRow: currentGradeItem.modeRow, mode: currentGradeItem.mode, score: score }).then(res=>{
+  jsonp({ action:"grade", reviewer: currentEmail, totalRow: currentGradeItem.totalRow, modeRow: currentGradeItem.modeRow, mode: currentGradeItem.mode, score: score, detail: detail }).then(res=>{
     if(!res || !res.ok) throw new Error(res && res.error ? res.error : "寫入失敗");
-    status.className="status ok"; status.textContent=`✓ 已將 ${score} 分寫入(總表＋模式分頁)`;
+    status.className="status ok"; status.textContent=`✓ 已將 ${score} 分與批改明細儲存`;
+    currentGradeItem.gradeDetail = collectGradeDetail(); // 讓本次面板保留還原狀態
     btn.disabled=false;
     loadSubmissions();
   }).catch(err=>{
@@ -1115,6 +1157,53 @@ document.getElementById("btn-grade-save").addEventListener("click", ()=>{
     btn.disabled=false;
   });
 });
+
+/* ===== 一鍵複製批改截圖 ===== */
+function loadHtml2Canvas(){
+  return new Promise((resolve, reject)=>{
+    if(window.html2canvas) return resolve();
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+    s.onload = ()=>resolve();
+    s.onerror = ()=>reject(new Error("無法載入截圖元件(請檢查網路)"));
+    document.head.appendChild(s);
+  });
+}
+
+document.getElementById("btn-grade-shot").addEventListener("click", captureGradeShot);
+
+async function captureGradeShot(){
+  const status = document.getElementById("grade-status");
+  const btn = document.getElementById("btn-grade-shot");
+  status.className="status"; status.textContent="產生截圖中…";
+  btn.disabled = true;
+  try{
+    await loadHtml2Canvas();
+    // 把 input 目前的值同步到 attribute，截圖才顯示得出來
+    document.querySelectorAll("#grade-capture input").forEach(inp=>{ inp.setAttribute("value", inp.value); });
+    const target = document.getElementById("grade-capture");
+    const canvas = await html2canvas(target, { backgroundColor:"#0f1524", scale:2, useCORS:true });
+    canvas.toBlob(async (blob)=>{
+      if(!blob){ status.className="status err"; status.textContent="截圖失敗"; btn.disabled=false; return; }
+      try{
+        await navigator.clipboard.write([ new ClipboardItem({ "image/png": blob }) ]);
+        status.className="status ok"; status.textContent="✓ 已複製批改截圖到剪貼簿,可直接貼上";
+      }catch(err){
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `批改_${(currentGradeItem&&currentGradeItem.email)||"screenshot"}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        status.className="status ok"; status.textContent="✓ 已下載截圖(此瀏覽器不支援直接複製圖片)";
+      }
+      btn.disabled=false;
+    }, "image/png");
+  }catch(err){
+    status.className="status err"; status.textContent="截圖失敗:"+err.message;
+    btn.disabled=false;
+  }
+}
 
 /* ==========================================================================
    15) JSONP 工具
