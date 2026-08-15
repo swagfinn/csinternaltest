@@ -995,7 +995,7 @@ function renderReviewTable(){
 
 function deleteSubmission(item){
   if(!confirm(`確定刪除這筆作答?（無法復原）\n\n${item.email}\n${item.mode}\n${item.datetime}\n\n總表與模式分頁都會一併移除。`)) return;
-  jsonp({ action:"delete", reviewer: currentEmail, email:item.email, datetime:item.datetime, mode:item.mode }).then(res=>{
+  jsonp({ action:"delete", reviewer: currentEmail, totalRow:item.totalRow, modeRow:item.modeRow, mode:item.mode }).then(res=>{
     if(!res || !res.ok) throw new Error(res && res.error ? res.error : "刪除失敗");
     if(res.deleted === 0){ alert("找不到對應紀錄,可能是舊格式資料,請直接於 Google Sheet 手動刪除。"); }
     loadSubmissions();
@@ -1076,7 +1076,7 @@ document.getElementById("btn-grade-save").addEventListener("click", ()=>{
   const score = document.getElementById("grade-total").textContent.trim();
   if(!currentGradeItem) return;
   btn.disabled = true; status.className="status"; status.textContent="儲存中…";
-  jsonp({ action:"grade", reviewer: currentEmail, email: currentGradeItem.email, datetime: currentGradeItem.datetime, mode: currentGradeItem.mode, score: score }).then(res=>{
+  jsonp({ action:"grade", reviewer: currentEmail, totalRow: currentGradeItem.totalRow, modeRow: currentGradeItem.modeRow, mode: currentGradeItem.mode, score: score }).then(res=>{
     if(!res || !res.ok) throw new Error(res && res.error ? res.error : "寫入失敗");
     status.className="status ok"; status.textContent=`✓ 已將 ${score} 分寫入(總表＋模式分頁)`;
     btn.disabled=false;
