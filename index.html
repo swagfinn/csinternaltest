@@ -900,17 +900,17 @@ document.getElementById("btn-confirm").addEventListener("click", submitToSheet);
 /* ==========================================================================
    13) 寫入 Google Sheet（JSONP）
    ========================================================================== */
+let submitting = false;   // 送出中旗標（取代停用按鈕，避免按鈕卡住）
 function submitToSheet(){
-  const btn = document.getElementById("btn-confirm");
+  if(submitting) return;                       // 送出中：忽略重複點擊
   const status = document.getElementById("submit-status");
-  btn.disabled = true;
+  submitting = true;
   status.className = "status";
   status.textContent = "送出中…";
 
   const quiz = QUIZZES[currentMode];
   const answers = quiz.questions.map(q => readAnswer(q).display);        // 純答案
   const questions = quiz.questions.map((q,i) => `Q${i+1}. ${q.text}`);   // 題目（含 Q 編號）
-  const submitId = Date.now() + "_" + Math.random().toString(36).slice(2,8); // 唯一識別碼
   const durationText = fmtDuration(currentElapsedMs());
   const dateText = new Date(answerStartISO).toLocaleString("zh-TW",{timeZone:"Asia/Taipei",hour12:false});
 
@@ -921,24 +921,23 @@ function submitToSheet(){
     duration: durationText,
     mode: quiz.title,
     answers: JSON.stringify(answers),
-    questions: JSON.stringify(questions),
-    id: submitId
+    questions: JSON.stringify(questions)
   }).then(res=>{
+    submitting = false;
     if(res && res.ok){
       document.getElementById("done-summary").textContent =
         `${quiz.title} · 作答耗時 ${durationText}`;
       completedTitles.add(quiz.title);  // 立即標記，回模式頁即反灰
       renderModeGrid();
       resetTimer();
-      btn.disabled = false;             // 解開送出按鈕，讓下一個模式仍可送出
       showScreen("screen-done");
     } else {
       throw new Error(res && res.error ? res.error : "未知錯誤");
     }
   }).catch(err=>{
+    submitting = false;
     status.className = "status err";
     status.textContent = "送出失敗:" + err.message + "(請稍後再試或聯絡管理員)";
-    btn.disabled = false;
   });
 }
 
@@ -1335,6 +1334,8 @@ function escapeHtml(str){
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
     .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
+
+console.log("SWAG 內部訓練測驗 — build 2026-08-18 (multi-submit fix)");
 </script>
 </body>
 </html>
