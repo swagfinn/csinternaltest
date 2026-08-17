@@ -930,6 +930,7 @@ function submitToSheet(){
       completedTitles.add(quiz.title);  // 立即標記，回模式頁即反灰
       renderModeGrid();
       resetTimer();
+      btn.disabled = false;             // 解開送出按鈕，讓下一個模式仍可送出
       showScreen("screen-done");
     } else {
       throw new Error(res && res.error ? res.error : "未知錯誤");
@@ -948,7 +949,7 @@ document.getElementById("btn-home").addEventListener("click", ()=>{ showScreen("
    ========================================================================== */
 document.getElementById("btn-reviewer").addEventListener("click", openReviewer);
 document.getElementById("btn-rev-back").addEventListener("click", ()=>showScreen("screen-modes"));
-document.getElementById("btn-refresh").addEventListener("click", loadSubmissions);
+document.getElementById("btn-refresh").addEventListener("click", ()=>loadSubmissions());
 document.getElementById("btn-grade-close").addEventListener("click", ()=>{
   document.getElementById("grade-panel").style.display = "none";
 });
@@ -1025,9 +1026,9 @@ function saveSchedule(collapseAfter){
   });
 }
 
-function loadSubmissions(){
+function loadSubmissions(silent){
   const body = document.getElementById("rev-body");
-  body.innerHTML = `<tr><td colspan="7" class="loading">載入中…</td></tr>`;
+  if(!silent) body.innerHTML = `<tr><td colspan="7" class="loading">載入中…</td></tr>`;
 
   jsonp({ action:"list", reviewer: currentEmail }).then(res=>{
     if(!res || !res.ok) throw new Error(res && res.error === "unauthorized" ? "無審核權限" : (res && res.error ? res.error : "讀取失敗"));
@@ -1082,18 +1083,34 @@ function renderReviewTable(){
         <button class="btn small danger btn-del" title="刪除這筆作答">🗑</button>
       </td>`;
     tr.querySelector(".btn-grade").addEventListener("click", ()=>openGrade(it));
-    tr.querySelector(".btn-del").addEventListener("click", ()=>deleteSubmission(it));
+    tr.querySelector(".btn-del").addEventListener("click", ()=>deleteSubmission(it, tr));
     body.appendChild(tr);
   });
 }
 
-function deleteSubmission(item){
+function deleteSubmission(item, tr){
   if(!confirm(`確定刪除這筆作答?（無法復原）\n\n${item.email}\n${item.mode}\n${item.datetime}\n\n總表與模式分頁都會一併移除。`)) return;
+  const delBtn = tr.querySelector(".btn-del");
+  const gradeBtn = tr.querySelector(".btn-grade");
+  // 處理中：該列淡化並顯示「刪除中…」，不動到其他列、不整頁空白
+  tr.style.opacity = "0.45";
+  delBtn.disabled = true; gradeBtn.disabled = true;
+  delBtn.textContent = "刪除中…";
+
   jsonp({ action:"delete", reviewer: currentEmail, totalRow:item.totalRow, modeRow:item.modeRow, mode:item.mode }).then(res=>{
     if(!res || !res.ok) throw new Error(res && res.error ? res.error : "刪除失敗");
-    if(res.deleted === 0){ alert("找不到對應紀錄,可能是舊格式資料,請直接於 Google Sheet 手動刪除。"); }
-    loadSubmissions();
-  }).catch(err=>{ alert("刪除失敗:"+err.message); });
+    if(res.deleted === 0){
+      // 沒刪到：還原該列
+      tr.style.opacity = ""; delBtn.disabled = false; gradeBtn.disabled = false; delBtn.textContent = "🗑";
+      alert("找不到對應紀錄,可能已被刪除,請按「↻ 重新整理」。");
+      return;
+    }
+    // 成功：靜默重新載入（表格不會變空白，列號同步更新，該筆自然消失）
+    loadSubmissions(true);
+  }).catch(err=>{
+    tr.style.opacity = ""; delBtn.disabled = false; gradeBtn.disabled = false; delBtn.textContent = "🗑";
+    alert("刪除失敗:" + err.message);
+  });
 }
 
 function openGrade(item){
