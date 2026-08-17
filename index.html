@@ -887,6 +887,7 @@ function buildReview(){
   });
   document.getElementById("submit-status").textContent = "";
   document.getElementById("submit-status").className = "status";
+  document.getElementById("btn-confirm").disabled = false; // 重設送出按鈕，避免卡在上次狀態
 }
 
 document.getElementById("btn-edit").addEventListener("click", ()=>{
