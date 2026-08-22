@@ -479,6 +479,7 @@ let answerStartISO = "";     // 首次作答時間（B 欄）
 let completedTitles = new Set(); // 該使用者已完成的模式（以 title 判定）
 let schedule = {};           // 各模式開放時間 { title:{start,end} }
 let lastSubmit = {};         // 各模式最後送出時間戳(ms)，供 8 小時鎖定
+let peekTitles = new Set();  // 因偷看而鎖定的模式
 const LOCK_MS  = 8 * 60 * 60 * 1000;  // 送出後鎖定 8 小時
 const LIMIT_MS = 10 * 60 * 1000;      // 作答上限 10 分鐘
 const WARN1_MS = 8  * 60 * 1000;      // 8 分鐘提醒
@@ -548,6 +549,8 @@ function fetchCompletedStatus(){
     if(res && res.ok){
       if(Array.isArray(res.completed)) completedTitles = new Set(res.completed);
       lastSubmit = res.lastSubmit || {};
+      const pk = res.peek || {};
+      peekTitles = new Set(Object.keys(pk).filter(t=>pk[t]));
       renderModeGrid();
     }
   }).catch(()=>{ /* 查詢失敗就維持全部可作答，不打斷使用者 */ });
@@ -617,12 +620,15 @@ function renderModeGrid(){
     }
 
     if(lk.locked){
+      const isPeek = peekTitles.has(q.title);
       el.className = "mode-card locked";
       el.innerHTML = `
-        <span class="lock-badge">🔒 作答冷卻中</span>
+        <span class="lock-badge">🔒 ${isPeek ? '已鎖定' : '作答冷卻中'}</span>
         <div class="tag">${q.tag}</div>
         <div class="name">${q.title}</div>
-        <div class="meta">已送出，需 8 小時後才能再作答<br>可於 ${fmtClock(lk.until)} 後重試（或通知審核者刪除紀錄）</div>`;
+        <div class="meta">${isPeek
+          ? '請不要使用腳滑之術👀 無法填寫請洽詢 FIN'
+          : '已送出，需 8 小時後才能再作答<br>可於 ' + fmtClock(lk.until) + ' 後重試（或通知審核者刪除紀錄）'}</div>`;
       grid.appendChild(el);
       return;
     }
@@ -641,11 +647,52 @@ function renderModeGrid(){
   });
 }
 document.getElementById("btn-back-modes").addEventListener("click", ()=>{
+  const quiz = QUIZZES[currentMode];
+  // 偷看偵測：全部點開卻無有效作答（審核者豁免）
+  if(currentEmail !== REVIEWER_EMAIL && quiz){
+    const ev = evaluateQuizAttempt();
+    if(ev.allRevealed && !ev.anyAnswered){ triggerPeekLock(quiz); return; }
+  }
   if(timerStarted && !confirm("返回模式選擇將清除目前作答,確定?")) return;
   resetTimer();
   renderModeGrid();
   showScreen("screen-modes");
 });
+
+/* 評估本次作答：是否全部題目已點開、是否有任一題「有效作答」
+   有效作答＝單/複選有選；簡答/詳答輸入 ≥ 5 字元 */
+function evaluateQuizAttempt(){
+  const quiz = QUIZZES[currentMode];
+  if(!quiz) return { allRevealed:false, anyAnswered:true };
+  let allRevealed = true, anyAnswered = false;
+  quiz.questions.forEach(q=>{
+    const card = document.getElementById("card-"+q.id);
+    if(!card || !card.classList.contains("revealed")) allRevealed = false;
+    const a = readAnswer(q);
+    if(q.type === "single" || q.type === "multiple"){
+      if(a.filled) anyAnswered = true;
+    } else {
+      if(a.display && a.display.trim().length >= 5) anyAnswered = true;
+    }
+  });
+  return { allRevealed, anyAnswered };
+}
+
+/* 觸發偷看鎖定：送 peek 到後端、本地立即鎖定該模式、提示、回模式頁 */
+function triggerPeekLock(quiz){
+  const durationText = fmtDuration(currentElapsedMs());
+  const dateText = new Date().toLocaleString("zh-TW",{timeZone:"Asia/Taipei",hour12:false});
+  jsonp({ action:"peek", email:currentEmail, mode:quiz.title, datetime:dateText,
+          opened:String(quiz.questions.length), duration:durationText })
+    .then(res=>{ if(res && res.submitMs) lastSubmit[quiz.title] = res.submitMs; renderModeGrid(); })
+    .catch(()=>{});
+  lastSubmit[quiz.title] = Date.now();   // 本地立即鎖定
+  peekTitles.add(quiz.title);
+  alert("請不要使用腳滑之術👀 無法填寫請洽詢 FIN");
+  resetTimer();
+  renderModeGrid();
+  showScreen("screen-modes");
+}
 
 /* ==========================================================================
    8) 開始作答 + 渲染題目
@@ -1065,18 +1112,21 @@ function renderReviewTable(){
   items.forEach(it=>{
     const scored = it.score !== "" && it.score !== null && it.score !== undefined;
     const tr = document.createElement("tr");
+    const modeCell = escapeHtml(String(it.mode||"")) + (it.peek ? ' <span style="color:var(--warn);font-weight:700;">👀 偷看</span>' : '');
+    const actionCell = it.peek
+      ? `<button class="btn small danger btn-del" title="刪除並解鎖">🗑</button>`
+      : `<button class="btn small btn-grade ${scored?"graded":""}">${scored?"✓ 已批改":"批改"}</button>
+         <button class="btn small danger btn-del" title="刪除這筆作答">🗑</button>`;
     tr.innerHTML = `
       <td>${it.order + 1}</td>
       <td>${escapeHtml(String(it.email||""))}</td>
       <td>${escapeHtml(String(it.datetime||""))}</td>
-      <td>${escapeHtml(String(it.mode||""))}</td>
+      <td>${modeCell}</td>
       <td>${escapeHtml(fmtDurationDisplay(it.duration))}</td>
-      <td><span class="score-pill ${scored?"":"empty"}">${scored?escapeHtml(String(it.score)):"未評"}</span></td>
-      <td style="white-space:nowrap;">
-        <button class="btn small btn-grade ${scored?"graded":""}">${scored?"✓ 已批改":"批改"}</button>
-        <button class="btn small danger btn-del" title="刪除這筆作答">🗑</button>
-      </td>`;
-    tr.querySelector(".btn-grade").addEventListener("click", ()=>openGrade(it));
+      <td>${it.peek ? '<span class="score-pill empty">偷看</span>' : `<span class="score-pill ${scored?"":"empty"}">${scored?escapeHtml(String(it.score)):"未評"}</span>`}</td>
+      <td style="white-space:nowrap;">${actionCell}</td>`;
+    const gb = tr.querySelector(".btn-grade");
+    if(gb) gb.addEventListener("click", ()=>openGrade(it));
     tr.querySelector(".btn-del").addEventListener("click", ()=>deleteSubmission(it, tr));
     body.appendChild(tr);
   });
