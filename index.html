@@ -484,6 +484,8 @@ const LOCK_MS  = 8 * 60 * 60 * 1000;  // 送出後鎖定 8 小時
 const LIMIT_MS = 10 * 60 * 1000;      // 作答上限 10 分鐘
 const WARN1_MS = 8  * 60 * 1000;      // 8 分鐘提醒
 let warned8 = false, warned10 = false, forceSubmitted = false;
+const IDLE_MS = 150 * 1000;           // 閒置上限 2 分 30 秒（無簡答/詳答輸入）
+let idleHandle = null;                // 閒置倒數 timer
 // 計時器（累計制：回上一頁編輯會續計）
 let timerRunning = false, timerStarted = false, runStart = 0, elapsedMs = 0, tickHandle = null;
 
@@ -627,7 +629,7 @@ function renderModeGrid(){
         <div class="tag">${q.tag}</div>
         <div class="name">${q.title}</div>
         <div class="meta">${isPeek
-          ? '請不要使用腳滑之術👀 無法填寫請洽詢 FIN'
+          ? '先複習吸收,準備好再來作答 🌱 有問題找 FIN'
           : '已送出，需 8 小時後才能再作答<br>可於 ' + fmtClock(lk.until) + ' 後重試（或通知審核者刪除紀錄）'}</div>`;
       grid.appendChild(el);
       return;
@@ -688,7 +690,7 @@ function triggerPeekLock(quiz){
     .catch(()=>{});
   lastSubmit[quiz.title] = Date.now();   // 本地立即鎖定
   peekTitles.add(quiz.title);
-  alert("請不要使用腳滑之術👀 無法填寫請洽詢 FIN");
+  alert("先別急著看完所有題目喔 👀 建議先把內容吸收理解,再回來好好作答。\n考試的初衷是幫助大家學以致用、舉一反三,而不是為了應付考試。\n有問題歡迎找 FIN 聊聊 💪");
   resetTimer();
   renderModeGrid();
   showScreen("screen-modes");
@@ -744,24 +746,53 @@ function startQuiz(key){
       <div class="q-body">${body}</div>`;
     box.appendChild(card);
 
-    // 點劇透遮罩 → 只顯示這一題，並啟動全域計時（首次）
+    // 點劇透遮罩 → 只顯示這一題，啟動全域計時（首次）與閒置倒數
     card.querySelector(".q-veil").addEventListener("click", ()=>{
       card.classList.add("revealed");
       startTimerOnce();
+      startIdleWatch();          // 首次點開題目 → 開始閒置倒數
     });
   });
 
-  // 選項高亮（不再由輸入啟動計時，計時改由點開題目啟動）
+  // 選項高亮；簡答/詳答輸入才重置閒置倒數（選答案、點開題目不重置）
   box.querySelectorAll("input, textarea").forEach(el=>{
-    el.addEventListener("input", syncOptionHighlight);
+    el.addEventListener("input", ()=>{
+      syncOptionHighlight();
+      if(el.tagName === "TEXTAREA") resetIdleWatch();   // 只有簡答/詳答輸入重置
+    });
     el.addEventListener("change", syncOptionHighlight);
   });
 
   // 重設本次作答狀態
   warned8 = false; warned10 = false; forceSubmitted = false;
   document.getElementById("timer-alert").style.display = "none";
+  clearTimeout(idleHandle);
   resetTimer();
   showScreen("screen-quiz");
+}
+
+/* 閒置監看：點開任一題後開始；只有簡答/詳答輸入會重置；2:30 無輸入 → 自動退出。
+   若本模式沒有任何簡答/詳答題（全選擇題），不啟用（避免誤退）。 */
+function hasTextQuestion(){
+  const quiz = QUIZZES[currentMode];
+  return !!(quiz && quiz.questions.some(q => q.type === "short" || q.type === "long"));
+}
+function startIdleWatch(){
+  if(!hasTextQuestion()) return;
+  resetIdleWatch();
+}
+function resetIdleWatch(){
+  if(!hasTextQuestion()) return;
+  clearTimeout(idleHandle);
+  idleHandle = setTimeout(idleExit, IDLE_MS);
+}
+function idleExit(){
+  if(!document.getElementById("screen-quiz").classList.contains("active")) return;
+  clearTimeout(idleHandle);
+  resetTimer();
+  renderModeGrid();
+  showScreen("screen-modes");
+  alert("休息一下沒關係 🌱 這次先退出囉。\n不知道怎麼寫嗎?先回去複習、消化一下,準備好再回來作答。");
 }
 
 function syncOptionHighlight(){
@@ -800,6 +831,7 @@ function pauseTimer(){
 function resetTimer(){
   timerRunning = false; timerStarted = false; runStart = 0; elapsedMs = 0;
   clearInterval(tickHandle);
+  clearTimeout(idleHandle);
   document.getElementById("timer").style.display = "none";
   document.getElementById("timer").classList.remove("paused");
   document.getElementById("timer-display").textContent = "00:00";
@@ -815,7 +847,7 @@ function updateTimerDisplay(){
   }
   if(ms >= LIMIT_MS && !forceSubmitted){
     warned10 = true; forceSubmitted = true;
-    showTimerAlert("⛔ 已達 10 分鐘,系統自動交卷");
+    showTimerAlert("時間到囉 ⏰ 這次先交卷,把握學到的、下次會更好!");
     forceSubmit();
   }
 }
@@ -828,6 +860,7 @@ function showTimerAlert(msg){
 /* 10 分鐘到 → 未填留空、略過補題提醒，直接進檢查頁，且不可再回去編輯 */
 function forceSubmit(){
   if(!document.getElementById("screen-quiz").classList.contains("active")) return;
+  clearTimeout(idleHandle);
   pauseTimer();
   buildReview();
   showScreen("screen-review");
@@ -869,6 +902,7 @@ document.getElementById("btn-submit").addEventListener("click", ()=>{
     }
   }
   // 全部完成 → 停止計時、進檢查頁
+  clearTimeout(idleHandle);
   pauseTimer();
   buildReview();
   showScreen("screen-review");
@@ -906,6 +940,7 @@ function buildReview(){
 
 document.getElementById("btn-edit").addEventListener("click", ()=>{
   resumeTimer();               // 回去編輯 → 續計時
+  resetIdleWatch();            // 回去編輯 → 重啟閒置倒數
   showScreen("screen-quiz");
 });
 
