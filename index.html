@@ -690,7 +690,7 @@ function triggerPeekLock(quiz){
     .catch(()=>{});
   lastSubmit[quiz.title] = Date.now();   // 本地立即鎖定
   peekTitles.add(quiz.title);
-  alert("先別急著看完所有題目喔 👀 建議先把內容吸收理解,再回來好好作答。\n考試的初衷是幫助大家學以致用、舉一反三,而不是為了應付考試。\n有問題歡迎找 FIN 聊聊 💪");
+  alert("先別急著看完所有題目喔 👀 建議先把內容吸收理解,再回來好好作答。");
   resetTimer();
   renderModeGrid();
   showScreen("screen-modes");
